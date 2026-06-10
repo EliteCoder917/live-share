@@ -11,6 +11,7 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer";
+import WebSocket from "ws";
 import { createClient } from "@supabase/supabase-js";
 import { startBrowserSession } from "./browserSession.mjs";
 
@@ -35,7 +36,8 @@ if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
 // (it runs on a trusted server, never in a browser).
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
-  realtime: { params: { eventsPerSecond: 40 } },
+  // Node < 22 has no global WebSocket; supply one for Realtime.
+  realtime: { transport: WebSocket, params: { eventsPerSecond: 40 } },
 });
 
 const browser = await puppeteer.launch({

@@ -10,6 +10,7 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import puppeteer from "puppeteer";
+import WebSocket from "ws";
 import { createClient } from "@supabase/supabase-js";
 import { startBrowserSession } from "./browserSession.mjs";
 
@@ -47,7 +48,8 @@ const browser = await puppeteer.launch({
 
 const realtime = createClient(SUPABASE_URL, ANON_KEY, {
   auth: { persistSession: false },
-  realtime: { params: { eventsPerSecond: 40 } },
+  // Node < 22 has no global WebSocket; supply one for Realtime.
+  realtime: { transport: WebSocket, params: { eventsPerSecond: 40 } },
 });
 
 const session = await startBrowserSession(browser, realtime, SESSION_ID, {

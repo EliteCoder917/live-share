@@ -1,0 +1,15 @@
+{
+  "name": "flowbot-host-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Runs on the host device. Launches real browser windows and serves them to Flowbot clients over Supabase Realtime.",
+  "scripts": {
+    "start": "node agent.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "puppeteer": "^23.0.0"
+  }
+}

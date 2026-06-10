@@ -15,9 +15,16 @@ Built with **Next.js 15 (App Router) + TypeScript + Tailwind + Supabase**.
   (`src/lib/supabase.ts`). It bypasses RLS, so authorization is enforced in our
   server actions using the logged-in session. RLS policies in `schema.sql` are
   defense-in-depth for any anon-key access.
-- **Live rooms** use the Supabase **anon** client in the browser
-  (`src/lib/supabase-browser.ts`) purely for Realtime: presence (who's in the
-  room) and broadcast signaling (WebRTC offer/answer/ICE). Media flows P2P.
+- **Live rooms** are a remote-browser-server model:
+  - The **host** runs a Node agent (`host/agent.mjs`) on their device. It launches
+    real Chrome windows via Puppeteer, streams each as JPEG frames (Chrome
+    DevTools screencast), and applies mouse/keyboard/navigation input.
+  - **Clients** (the `/room/[id]` page) list the hosted windows, render the live
+    frames of the one they pick, and forward input back. Multiple clients can each
+    drive a different window at once — the host device is the server.
+  - Both sides connect through a Supabase Realtime channel (`room:<sessionId>`),
+    which relays the window list, frames, input, and presence. No inbound ports or
+    NAT traversal needed; both make outbound connections to Supabase.
 
 ## Setup
 
@@ -47,8 +54,16 @@ Built with **Next.js 15 (App Router) + TypeScript + Tailwind + Supabase**.
 1. Register → you land on the dashboard.
 2. **New service** → pick a type and capacity.
 3. **Go live** → a join code is generated and the room opens.
-4. As host, click **Share** and pick a screen/tab/window — viewers see it live.
-5. Share the code; others go to `/join`, enter it, and watch in real time.
+4. As host, start the agent on your device (the room page shows the exact command):
+   ```bash
+   cd host
+   npm install            # first time only; downloads Chromium
+   SESSION_ID=<id> npm start
+   # optional: WINDOWS=3 START_URL=https://example.com
+   ```
+5. Share the code; others go to `/join`, enter it, pick a window from the sidebar,
+   and actually use that browser — clicking, typing, scrolling, navigating — all
+   running on your device.
 
 ## Routes
 
@@ -63,9 +78,15 @@ Built with **Next.js 15 (App Router) + TypeScript + Tailwind + Supabase**.
 
 ## Notes / next steps
 
-- The room currently streams **host → viewers** (one-way video). Remote *control*
-  (forwarding viewer input back to the host's browser) would add an RTCDataChannel
-  plus a host-side agent (e.g. Puppeteer) — scaffolding is in `RoomClient.tsx`.
-- WebRTC uses a public Google STUN server. For restrictive networks, add a TURN
-  server to `ICE_CONFIG` in `RoomClient.tsx`.
+- **Transport.** Frames currently flow through Supabase Realtime broadcast as
+  base64 JPEG, throttled by viewport (1024×640) and quality (45) in
+  `host/agent.mjs`. That's great for getting started but will hit Realtime
+  rate/size limits with many windows or clients. To scale, move frame transport to
+  WebRTC video (host agent as a peer) or a dedicated WebSocket relay, keeping the
+  Supabase channel just for signaling/coordination.
+- **Security.** Anyone who learns a `sessionId` can join its channel. Harden by
+  enabling Supabase Realtime Authorization (RLS on the `realtime.messages` schema)
+  so only authenticated participants of a session can subscribe.
+- **Host agent** lives in [`host/`](host/) with its own `package.json` (Puppeteer
+  is heavy), so the web app stays lean.
 - Every database change is logged in [`supabase/CHANGELOG.md`](supabase/CHANGELOG.md).

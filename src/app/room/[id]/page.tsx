@@ -65,9 +65,8 @@ export default async function RoomPage({
       ) : (
         <RoomClient
           sessionId={sess.id}
-          serviceType={svc.type}
           isHost={isHost}
-          selfId={userId ?? `guest-${sess.id.slice(0, 8)}`}
+          selfId={userId ?? `guest-${Math.random().toString(36).slice(2, 10)}`}
         />
       )}
     </div>

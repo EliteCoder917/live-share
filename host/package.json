@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Runs on the host device. Launches real browser windows and serves them to Flowbot clients over Supabase Realtime.",
   "scripts": {
-    "start": "node agent.mjs"
+    "start": "node agent.mjs",
+    "manager": "node manager.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

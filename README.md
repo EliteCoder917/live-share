@@ -15,16 +15,23 @@ Built with **Next.js 15 (App Router) + TypeScript + Tailwind + Supabase**.
   (`src/lib/supabase.ts`). It bypasses RLS, so authorization is enforced in our
   server actions using the logged-in session. RLS policies in `schema.sql` are
   defense-in-depth for any anon-key access.
-- **Live rooms** are a remote-browser-server model:
-  - The **host** runs a Node agent (`host/agent.mjs`) on their device. It launches
-    real Chrome windows via Puppeteer, streams each as JPEG frames (Chrome
-    DevTools screencast), and applies mouse/keyboard/navigation input.
+- **Live rooms** are a remote-browser-server model. Real Chrome windows run on a
+  server you control (e.g. a free Oracle Cloud Ubuntu VM); **end users install
+  nothing**.
+  - A long-running **manager** (`host/manager.mjs`) watches the DB and
+    automatically serves every live `live_browser` session — opening Chrome
+    windows, streaming each as throttled JPEG frames (Chrome DevTools screencast),
+    and applying incoming mouse/keyboard/navigation input. See
+    [`host/README.md`](host/README.md) for deployment.
   - **Clients** (the `/room/[id]` page) list the hosted windows, render the live
     frames of the one they pick, and forward input back. Multiple clients can each
-    drive a different window at once — the host device is the server.
-  - Both sides connect through a Supabase Realtime channel (`room:<sessionId>`),
-    which relays the window list, frames, input, and presence. No inbound ports or
-    NAT traversal needed; both make outbound connections to Supabase.
+    drive a different window at once.
+  - Everything flows through a Supabase Realtime channel (`room:<sessionId>`) that
+    relays the window list, frames, input, and presence — no inbound ports or NAT
+    traversal; the server and all clients connect outbound to Supabase.
+  - Frame transport is rate-limited on purpose (≈10 fps, newest frame only) to stay
+    within Realtime's event budget; `host/agent.mjs` serves a single session for
+    local testing.
 
 ## Setup
 
@@ -54,16 +61,15 @@ Built with **Next.js 15 (App Router) + TypeScript + Tailwind + Supabase**.
 1. Register → you land on the dashboard.
 2. **New service** → pick a type and capacity.
 3. **Go live** → a join code is generated and the room opens.
-4. As host, start the agent on your device (the room page shows the exact command):
-   ```bash
-   cd host
-   npm install            # first time only; downloads Chromium
-   SESSION_ID=<id> npm start
-   # optional: WINDOWS=3 START_URL=https://example.com
-   ```
+4. With the **manager** running on your server (see [`host/README.md`](host/README.md)),
+   browser windows appear in the room automatically within a few seconds — no
+   action needed from the host.
 5. Share the code; others go to `/join`, enter it, pick a window from the sidebar,
    and actually use that browser — clicking, typing, scrolling, navigating — all
-   running on your device.
+   running on your server.
+
+> Local testing without a server: `cd host && npm install`, then
+> `SESSION_ID=<id> npm start` to serve just the open session.
 
 ## Routes
 

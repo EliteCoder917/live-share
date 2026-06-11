@@ -40,15 +40,34 @@ export function RoomClient({
   const [agentOnline, setAgentOnline] = useState(false);
   const [addr, setAddr] = useState("");
   const [showHostHelp, setShowHostHelp] = useState(isHost);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<string | null>(null);
   const lastMoveRef = useRef(0);
 
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
+
+  // Track fullscreen state so the frame can resize and Esc updates the button.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      frameRef.current?.requestFullscreen().then(() => {
+        frameRef.current?.focus(); // keep keyboard input flowing to the window
+      }).catch(() => {});
+    }
+  }
 
   // --- messaging helpers -----------------------------------------------------
   function send(kind: string, extra: Record<string, unknown> = {}) {
@@ -123,11 +142,13 @@ export function RoomClient({
   function openWindow(id: string) {
     setSelected(id);
     setViewing(id);
+    send("watch", { windowId: id }); // start streaming immediately
     const w = windows.find((x) => x.id === id);
     setAddr(w?.url ?? "");
     if (imgRef.current) imgRef.current.src = "";
   }
   function backToList() {
+    if (selected) send("unwatch", { windowId: selected });
     setSelected(null);
     setViewing(null);
     if (imgRef.current) imgRef.current.src = "";
@@ -189,6 +210,28 @@ export function RoomClient({
                   placeholder="Type a URL and press Enter"
                 />
               </form>
+              <button
+                onClick={toggleFullscreen}
+                className="btn-ghost gap-1 px-2 py-1"
+                title="Fullscreen"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+                  <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+                  <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+                  <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+                </svg>
+                <span className="hidden sm:inline">Fullscreen</span>
+              </button>
               <button onClick={backToList} className="btn-ghost px-3 py-1">
                 Windows
               </button>
@@ -196,7 +239,12 @@ export function RoomClient({
 
             {/* The live browser frame. Focusable so it can capture keys. */}
             <div
-              className="relative aspect-[1024/640] w-full bg-black outline-none"
+              ref={frameRef}
+              className={`relative bg-black outline-none ${
+                isFullscreen
+                  ? "flex h-screen w-screen items-center justify-center"
+                  : "aspect-[1024/640] w-full"
+              }`}
               tabIndex={0}
               onMouseMove={(e) => {
                 const now = Date.now();
@@ -342,27 +390,32 @@ export function RoomClient({
           </ul>
         </div>
 
-        {isHost && (
+        {isHost && !agentOnline && (
           <div className="card">
             <button
               onClick={() => setShowHostHelp((s) => !s)}
               className="flex w-full items-center justify-between text-sm font-semibold text-neutral-300"
             >
-              Host server setup
+              Browser server offline
               <span className="text-neutral-500">{showHostHelp ? "−" : "+"}</span>
             </button>
             {showHostHelp && (
               <div className="mt-3 space-y-2 text-xs text-neutral-400">
-                <p>Run the agent on your device to serve the browser windows:</p>
+                <p>
+                  Browsers are served by the Flowbot manager running on your
+                  server. If windows aren&apos;t appearing, make sure the manager
+                  is running (see <code>host/README.md</code>):
+                </p>
                 <pre className="overflow-x-auto rounded-lg bg-neutral-950 p-3 text-[11px] text-neutral-300">
-{`cd host
-npm install
-SESSION_ID=${sessionId} npm start`}
+{`cd host && npm run manager`}
                 </pre>
                 <p>
-                  Optional: <code>WINDOWS=3</code>{" "}
-                  <code>START_URL=https://example.com</code>
+                  For local testing without the manager you can serve just this
+                  session:
                 </p>
+                <pre className="overflow-x-auto rounded-lg bg-neutral-950 p-3 text-[11px] text-neutral-300">
+{`SESSION_ID=${sessionId} npm start`}
+                </pre>
               </div>
             )}
           </div>

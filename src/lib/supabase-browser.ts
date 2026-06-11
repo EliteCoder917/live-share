@@ -12,6 +12,9 @@ export function getBrowserSupabase() {
   if (!client) {
     client = createClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
       auth: { persistSession: false },
+      // Default is 10 events/sec, which throttles live frames to a crawl.
+      // Raise it so streamed frames + input get through.
+      realtime: { params: { eventsPerSecond: 40 } },
     });
   }
   return client;
